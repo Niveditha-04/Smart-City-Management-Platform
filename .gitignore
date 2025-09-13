@@ -1,1 +1,23 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env / secrets
+.env
+**/.env
+**/.env.local
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Mac/OS
+.DS_Store
+
+# Docker
+**/.dockerignore
+docker-data/
 
