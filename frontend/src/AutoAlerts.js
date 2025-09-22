@@ -4,11 +4,17 @@ export default function AutoAlerts() {
   const [breaches, setBreaches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userrole, setUserRole] = useState("");
+  const [canAck,setCanAck] = useState(false);
 
   const userRole = (() => {
     try { return (JSON.parse(localStorage.getItem("user") || "{}").role) || "viewer"; }
     catch { return "viewer"; }
   })();
+
+  useEffect(()=>{
+    setUserRole(userRole)
+  },[])
 
   async function fetchBreaches() {
     setLoading(true);
@@ -69,7 +75,10 @@ export default function AutoAlerts() {
     return () => clearInterval(t);
   }, []);
 
-  const canAck = userRole === "operator";
+  useEffect(()=>{
+     console.log(userrole);
+     setCanAck((userrole === "operator" || userrole ==="admin"));
+  },[userrole]);
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
@@ -103,7 +112,7 @@ export default function AutoAlerts() {
                 Created: {new Date(b.created_at).toLocaleString()}
               </div>
             </div>
-            {canAck && <button onClick={() => ack(b.id)}>Acknowledge</button>}
+            {canAck && <button onClick={() => ack(b.id)}>Ack</button>}
           </li>
         ))}
       </ul>
