@@ -1,3 +1,4 @@
+// backend/server.js
 require("dotenv").config();
 
 const express = require("express");
@@ -12,9 +13,14 @@ const { pool, ensureWeek4Schema } = require("./db");
 const db = { query: (text, params) => pool.query(text, params) };
 
 const app = express();
+const notificationsRoutes = require("./notifications/notifications.routes");
 const PORT = process.env.PORT || 5050;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
+// Mount notifications (Twilio/Nodemailer/Web-Push)
+app.use("/notifications", notificationsRoutes);
+
+// ----- CORS / security / json -----
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:3000")
   .split(",")
   .map((s) => s.trim());
@@ -22,7 +28,7 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:3000")
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin) return cb(null, true); 
+      if (!origin) return cb(null, true); // allow same-origin / curl
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       cb(new Error("CORS not allowed"));
     },
@@ -114,195 +120,70 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ----- metrics -----
+// ----- metrics (tiles) -----
 app.get("/metrics/summary", (_req, res) => {
   res.json({
     traffic: 60 + Math.floor(Math.random() * 100), // 60–159
-    airQuality: 80 + Math.floor(Math.random() * 100), // 80–179 (AQI-ish)
+    airQuality: 80 + Math.floor(Math.random() * 100), // 80–179
     waste: 20 + Math.floor(Math.random() * 70), // 20–89
-    electricity: 300 + Math.floor(Math.random() * 250), // 300–549 (for UI tile)
+    electricity: 300 + Math.floor(Math.random() * 250), // 300–549
   });
 });
 
-// ----- thresholds  -----
-// all thresholds
-app.get("/thresholds", auth, async (_req, res) => {
+// ----- metrics (charts from DB) -----
+// Returns rows from metrics_timeseries seeded by ensureWeek4Schema (last 12h @ 10min)
+app.get("/metrics/timeseries", async (req, res) => {
   try {
-    const { rows } = await db.query(
-      "SELECT metric, warn, critical, updated_at FROM thresholds ORDER BY metric"
-    );
-    res.json({ thresholds: rows });
+    // optional ?metric=traffic&since=2025-09-23T00:00:00Z
+    const metric = (req.query.metric || "").toString().toLowerCase();
+    const since = req.query.since ? new Date(req.query.since) : null;
+
+    const allowed = ["traffic", "aqi", "waste", "power"];
+    const where = [];
+    const params = [];
+    if (metric) {
+      if (!allowed.includes(metric)) {
+        return res.status(400).json({ error: "Unknown metric" });
+      }
+      params.push(metric);
+      where.push(`metric = $${params.length}`);
+    }
+    if (since && !isNaN(since.valueOf())) {
+      params.push(since.toISOString());
+      where.push(`ts >= $${params.length}`);
+    } else {
+      // default: last 12 hours to keep payload small
+      where.push(`ts >= NOW() - INTERVAL '12 hours'`);
+    }
+    const sql =
+      "SELECT metric, value, ts FROM metrics_timeseries" +
+      (where.length ? " WHERE " + where.join(" AND ") : "") +
+      " ORDER BY ts ASC";
+
+    const { rows } = await db.query(sql, params);
+    res.json({ points: rows });
   } catch (err) {
-    console.error("Get thresholds error:", err);
-    res.status(500).json({ error: "Failed to fetch thresholds" });
+    console.error("Timeseries error:", err);
+    res.status(500).json({ error: "Failed to fetch timeseries" });
   }
 });
 
-app.put("/thresholds/:metric", auth, requireRole("admin"), async (req, res) => {
-  try {
-    const metric = String(req.params.metric || "").toLowerCase();
-    const { warn, critical } = req.body;
-
-    if (!["traffic", "aqi", "waste", "power"].includes(metric)) {
-      return res.status(400).json({ error: "Unknown metric" });
-    }
-    if (warn == null || critical == null) {
-      return res.status(400).json({ error: "Missing warn or critical" });
-    }
-    if (Number(warn) >= Number(critical)) {
-      return res.status(400).json({ error: "warn must be < critical" });
-    }
-
-    const { rows } = await db.query(
-      `INSERT INTO thresholds (metric, warn, critical, updated_at)
-       VALUES ($1,$2,$3,NOW())
-       ON CONFLICT (metric)
-       DO UPDATE SET warn=EXCLUDED.warn, critical=EXCLUDED.critical, updated_at=NOW()
-       RETURNING metric, warn, critical, updated_at`,
-      [metric, warn, critical]
-    );
-    res.json({ threshold: rows[0] });
-  } catch (err) {
-    console.error("Update threshold error:", err);
-    res.status(500).json({ error: "Failed to update threshold" });
-  }
-});
-
-// ----- auto alert breaches -----
-app.get("/alerts/breaches", auth, async (req, res) => {
-  try {
-    const status = (req.query.status || "all").toLowerCase();
-    let sql =
-      "SELECT id, metric, value, severity, message, created_at, acked_by, acked_at FROM alerts_breaches";
-    if (status === "active") sql += " WHERE acked_at IS NULL";
-    sql += " ORDER BY created_at DESC LIMIT 100";
-    const { rows } = await db.query(sql);
-    res.json({ breaches: rows });
-  } catch (err) {
-    console.error("List breaches error:", err);
-    res.status(500).json({ error: "Failed to fetch breaches" });
-  }
-});
-
-app.post(
-  "/alerts/breaches/:id/ack",
-  auth,
-  requireRole("operator", "admin"),
-  async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const { rows } = await db.query(
-        `UPDATE alerts_breaches
-         SET acked_by=$1, acked_at=NOW()
-         WHERE id=$2 AND acked_at IS NULL
-         RETURNING id, metric, severity, acked_by, acked_at`,
-        [req.user.id, id]
-      );
-      if (!rows.length) return res.status(404).json({ error: "Already acked or not found" });
-      res.json({ ok: true, breach: rows[0] });
-    } catch (err) {
-      console.error("Ack breach error:", err);
-      res.status(500).json({ error: "Failed to ack breach" });
-    }
-  }
-);
-
-// ----- background evaluator -----
-const EVAL_EVERY_MS = 15_000;
-
-async function evaluateAndInsertBreaches() {
-  try {
-    const { rows: ths } = await db.query("SELECT metric, warn, critical FROM thresholds");
-    const map = {};
-    for (const t of ths) map[t.metric] = { warn: Number(t.warn), critical: Number(t.critical) };
-
-    const current = {
-      traffic: 60 + Math.floor(Math.random() * 100),
-      aqi: 80 + Math.floor(Math.random() * 100),
-      waste: 20 + Math.floor(Math.random() * 70),
-      power: 80 + Math.floor(Math.random() * 20) + 20,
-    };
-
-    const checks = [
-      { metric: "traffic", value: current.traffic },
-      { metric: "aqi", value: current.aqi },
-      { metric: "waste", value: current.waste },
-      { metric: "power", value: current.power },
-    ];
-
-    for (const c of checks) {
-      const th = map[c.metric];
-      if (!th) continue;
-
-      let severity = null;
-      if (c.value >= th.critical) severity = "critical";
-      else if (c.value >= th.warn) severity = "warn";
-      if (!severity) continue;
-
-      const message = `${c.metric.toUpperCase()} ${severity.toUpperCase()} — value=${c.value}, thresholds warn=${th.warn}, critical=${th.critical}`;
-
-      const { rows: recent } = await db.query(
-        `SELECT id FROM alerts_breaches
-         WHERE metric=$1 AND severity=$2 AND created_at >= NOW() - INTERVAL '5 minutes'
-         ORDER BY created_at DESC LIMIT 1`,
-        [c.metric, severity]
-      );
-      if (recent.length) continue;
-
-      await db.query(
-        `INSERT INTO alerts_breaches (metric, value, severity, message)
-         VALUES ($1,$2,$3,$4)`,
-        [c.metric, c.value, severity, message]
-      );
-    }
-  } catch (err) {
-    console.error("Evaluator error:", err);
-  }
-}
-
-// ----- manual alerts -----
-app.get("/alerts", async (_req, res) => {
-  try {
-    const { rows } = await db.query(
-      "SELECT id,title,message,severity,created_at FROM alerts ORDER BY created_at DESC LIMIT 50"
-    );
-    res.json({ alerts: rows });
-  } catch (err) {
-    console.error("List alerts error:", err);
-    res.status(500).json({ error: "Failed to fetch alerts" });
-  }
-});
-
-app.post("/alerts", auth, async (req, res) => {
-  try {
-    const { title, message, severity = "low" } = req.body;
-    if (!title || !message) {
-      return res.status(400).json({ error: "Missing title or message" });
-    }
-
-    const { rows } = await db.query(
-      "INSERT INTO alerts (title,message,severity,created_at) VALUES ($1,$2,$3,NOW()) RETURNING id,title,message,severity,created_at",
-      [title, message, severity]
-    );
-    res.json({ alert: rows[0] });
-  } catch (err) {
-    console.error("Create alert error:", err);
-    res.status(500).json({ error: "Failed to create alert" });
-  }
-});
+/**
+ * IMPORTANT:
+ * We intentionally removed/disabled all code that referenced:
+ *   - thresholds, alerts_breaches, alerts tables
+ *   - background evaluator that queried thresholds
+ * This keeps the server error-free with the new DB schema (users + metrics_timeseries only).
+ */
 
 // ----- start AFTER ensuring schema -----
 ensureWeek4Schema()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`API running on http://localhost:${PORT}`);
-      setInterval(evaluateAndInsertBreaches, EVAL_EVERY_MS);
     });
   })
   .catch((err) => {
     console.error("Failed to initialize DB schema:", err);
     process.exit(1);
   });
-
-
-
