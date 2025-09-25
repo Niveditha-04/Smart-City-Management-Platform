@@ -18,7 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
  * Allow your Render FE + localhost. Set CORS_ORIGIN in Render like:
  * "https://smart-city-management-platform.onrender.com,http://localhost:3000"
  */
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:3000")
+const ALLOWED_ORIGINS = ("https://smartcity-kwvz.onrender.com/")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
