@@ -41,7 +41,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Make sure preflights always succeed fast
-app.options("*", cors(corsOptions));
+//app.options("*", cors(corsOptions));
 
 // ---- Body + security ----
 app.use(express.json());
