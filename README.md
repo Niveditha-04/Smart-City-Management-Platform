@@ -27,7 +27,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
   - Notifications via **Email (Resend)** and **Web Push API**
 
 - **Database (PostgreSQL)**
-  - Tables: `users`, `alerts`, `alerts_breaches`, `metrics_timeseries`, `thresholds`
+  - Tables: `users`, `alerts`, `breaches`, `metrics`, `thresholds`
   - Seed data for sample metrics and roles (Admin, Operator, Viewer)
 
 - **Security**
