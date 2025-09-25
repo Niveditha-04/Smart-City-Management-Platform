@@ -121,7 +121,7 @@ export default function Dashboard() {
       {/* charts */}
       <div style={{ marginTop: 36, display: "grid", gridTemplateColumns: "1fr", gap: 36 }}>
         <div>
-          <h3>Traffic Trend (last 10 updates)</h3>
+          <h3>Traffic Trend</h3>
           <MetricChart title="Traffic" points={trafficH} color="rgba(13, 148, 136, 1)" />
         </div>
         <div>
