@@ -52,7 +52,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
 ## Tech Stack
 - **Frontend:** React.js, Chart.js, Axios  
 - **Backend:** Node.js, Express.js, JWT, Bcrypt, Resend, Web Push API  
-- **Database:** PostgreSQL (via `pg`)  
+- **Database:** PostgreSQL  
 - **Security:** Helmet, express-rate-limit, CORS  
 - **Testing:** Jest, Supertest  
 - **Deployment:** Docker, Render  
