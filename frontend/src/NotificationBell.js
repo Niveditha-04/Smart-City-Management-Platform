@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
 const PAGE_SIZE = 5;
-const API_BASE = (window.__API_URL__ || process.env.REACT_APP_API_URL || "http://localhost:5050").replace(/\/$/, "");
+const rawUrl = window.__API_URL__ || process.env.REACT_APP_API_URL || "";
+const API_BASE = rawUrl.replace(/\/$/, "");
 
 // scoped axios with auth once
 const api = axios.create({ baseURL: API_BASE });

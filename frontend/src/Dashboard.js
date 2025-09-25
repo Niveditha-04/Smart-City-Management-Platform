@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import MatrixHeatmap from "./MatrixHeatmap";
 import axios from "axios";
 import { FaCar, FaLeaf, FaTrash, FaBolt } from "react-icons/fa";
 import MetricChart from "./MetricChart";
@@ -17,7 +18,7 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
-      const res = await axios.get("http://localhost:5050/metrics/summary");
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/metrics/summary`);
       const m = res.data;
       setMetrics(m);
       setLastUpdated(new Date().toLocaleTimeString());
@@ -144,6 +145,16 @@ export default function Dashboard() {
         waste={wasteH}
         power={powerH}
       />
+    </div>
+  );
+}
+
+
+/* Heatmap container appended */
+export function HeatmapSection({ matrixData }){
+  return (
+    <div style={{ width: "100%", height: 360, padding: 12, border: "1px solid #eee", borderRadius: 12, boxSizing: "border-box" }}>
+      <MatrixHeatmap data={matrixData.data} options={matrixData.options} padding={12} />
     </div>
   );
 }
