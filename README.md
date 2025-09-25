@@ -1,9 +1,32 @@
 # Smart City Management Platform 
 
-> **Capstone Project — IIT Guwahati Micro Degree Program (Computer Science)**
->
+**Capstone Project — IIT Guwahati Micro Degree Program (Computer Science)**
+
 > This project was developed as part of my final capstone submission for the IIT Guwahati Micro Degree Program.  
 > It demonstrates a full-stack implementation of a **Smart City Management Platform** with real-time dashboards, alerts, notifications, and role-based access.
+
+---
+**Links**
+
+**Frontend Dashboard Link:**
+
+**Backend Link:**
+
+--- 
+
+**Login Credentials**
+
+**1. Admin**
+- Username: admin@example.com
+- Password: secret123
+
+**2. Operator**
+- Username: ops@example.com
+- Password: operator123
+
+**3.Viewer**
+- Username: viewer@example.com
+- Password: viewer123
 
 ---
 
