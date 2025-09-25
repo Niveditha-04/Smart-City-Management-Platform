@@ -43,7 +43,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture.png)
+![Architecture Diagram](Images/Smartcity_Architecture.png)
 
 
 
