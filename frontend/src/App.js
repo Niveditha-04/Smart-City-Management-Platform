@@ -4,7 +4,6 @@ import axios from "axios";
 import Dashboard from "./Dashboard";
 import Alerts from "./Alerts";
 import AutoAlerts from "./AutoAlerts";
-import NotificationsBell from "./NotificationBell"; // <-- NEW
 
 function ProtectedRoute({ children, roles }) {
   const token = localStorage.getItem("token");
@@ -20,8 +19,6 @@ function ProtectedRoute({ children, roles }) {
 
 // ---------- Nav ----------
 function NavBar({ onLogout, authed, role }) {
-  const showBell = authed && (role === "viewer" || role === "operator");
-
   return (
     <div
       style={{
@@ -42,7 +39,6 @@ function NavBar({ onLogout, authed, role }) {
         <Link to="/auto-alerts">Auto Alerts</Link>
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        {showBell && <NotificationsBell />}
         {authed && <span style={{ fontSize: 12, opacity: 0.7 }}>Role: {role}</span>}
         {authed && (
           <button onClick={onLogout} style={{ padding: "6px 10px" }}>
@@ -61,6 +57,7 @@ function Login() {
   const [password, setPassword] = useState("secret123");
   const [error, setError] = useState("");
 
+  // if already logged in, go straight to dashboard
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) nav("/dashboard", { replace: true });
@@ -77,6 +74,7 @@ function Login() {
       localStorage.setItem("user", JSON.stringify(user || {}));
 
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
       window.location.replace("/dashboard");
     } catch (err) {
       console.error("Login failed:", err?.response?.data || err.message);
@@ -174,6 +172,7 @@ export default function App() {
           }
         />
 
+        {/* Auto Alerts */}
         <Route
           path="/auto-alerts"
           element={
@@ -182,6 +181,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Thresholds */}
+        {/* <Route
+          path="/admin/thresholds"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <ThresholdsPage />
+            </ProtectedRoute>
+          }
+        /> */}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

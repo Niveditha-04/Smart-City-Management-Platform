@@ -1,30 +1,27 @@
 import React, { useEffect, useState } from "react";
 
-const API_BASE = (window.__API_URL__ || process.env.REACT_APP_API_URL || "http://localhost:5050").replace(/\/$/, "");
-
 export default function AutoAlerts() {
   const [breaches, setBreaches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userrole, setUserRole] = useState("");
+  const [canAck,setCanAck] = useState(false);
 
-  // derive role once from localStorage
   const userRole = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "{}").role || "viewer";
-    } catch {
-      return "viewer";
-    }
+    try { return (JSON.parse(localStorage.getItem("user") || "{}").role) || "viewer"; }
+    catch { return "viewer"; }
   })();
 
-  // canAck is derived, no extra state needed
-  const canAck = userRole === "operator" || userRole === "admin";
+  useEffect(()=>{
+    setUserRole(userRole)
+  },[])
 
   async function fetchBreaches() {
     setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/alerts/breaches?status=active`, {
+      const res = await fetch("http://localhost:5050/alerts/breaches?status=active", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -34,14 +31,7 @@ export default function AutoAlerts() {
         return;
       }
 
-      if (res.status === 404) {
-        setBreaches([]);
-        setError("");
-        setLoading(false);
-        return;
-      }
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
-
       const data = await res.json();
       setBreaches(data.breaches || []);
     } catch (e) {
@@ -54,7 +44,7 @@ export default function AutoAlerts() {
   async function ack(id) {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/alerts/breaches/${id}/ack`, {
+      const res = await fetch(`http://localhost:5050/alerts/breaches/${id}/ack`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -84,6 +74,11 @@ export default function AutoAlerts() {
     const t = setInterval(fetchBreaches, 10000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(()=>{
+     console.log(userrole);
+     setCanAck((userrole === "operator" || userrole ==="admin"));
+  },[userrole]);
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: 24 }}>
