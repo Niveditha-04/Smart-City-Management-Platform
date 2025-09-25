@@ -14,31 +14,29 @@ const app = express();
 const PORT = process.env.PORT || 5050;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
-/**
- * Allow your Render FE + localhost. Set CORS_ORIGIN in Render like:
- * "https://smart-city-management-platform.onrender.com,http://localhost:3000"
- */
-const ALLOWED_ORIGINS = ("https://smartcity-kwvz.onrender.com/")
+
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "")
   .split(",")
-  .map((s) => s.trim())
+  .map(s => s.trim())
   .filter(Boolean);
 
-// If you ever set cookies over a proxy/CDN (Render), keep this:
-app.set("trust proxy", 1);
-
-// ---- CORS FIRST, before everything else ----
 const corsOptions = {
   origin(origin, cb) {
-    // no Origin (e.g. curl, server-to-server) -> allow
+    // No Origin header (e.g., curl/health checks) -> allow
     if (!origin) return cb(null, true);
+    // Exact match against allowed origins
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error("CORS: origin not allowed"));
+    // Don’t throw; just reject (no CORS headers added)
+    return cb(null, false);
   },
-  credentials: true, // ok even if you don't use cookies; harmless
+  credentials: true, // keep true only if you plan to use cookies; harmless otherwise
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
+
 app.use(cors(corsOptions));
+// Optional explicit preflight for Express 5 (regex, not "*")
+app.options(/.*/, cors(corsOptions));
 
 // Make sure preflights always succeed fast
 //app.options("*", cors(corsOptions));
