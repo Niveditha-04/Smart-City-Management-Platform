@@ -109,9 +109,9 @@ async function ensureWeek4Schema() {
   ON CONFLICT (metric) DO NOTHING;
 
   -- 4) users seed (idempotent via email)
-  -- admin: alice@example.com / secret123
+  -- admin: admin@example.com / secret123
   INSERT INTO public.users (name, email, role, password_hash)
-  VALUES ('Alice', 'alice@example.com', 'admin', crypt('secret123', gen_salt('bf')))
+  VALUES ('Admin', 'admin@example.com', 'admin', crypt('secret123', gen_salt('bf')))
   ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role;
 
   -- operator: ops@example.com / operator123
