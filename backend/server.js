@@ -8,36 +8,61 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const { pool, ensureWeek4Schema } = require("./db");
-
 const db = { query: (text, params) => pool.query(text, params) };
 
-const app = express(); // <- create app first
-
+const app = express();
 const PORT = process.env.PORT || 5050;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
+/**
+ * Allow your Render FE + localhost. Set CORS_ORIGIN in Render like:
+ * "https://smart-city-management-platform.onrender.com,http://localhost:3000"
+ */
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:3000")
   .split(",")
-  .map((s) => s.trim());
+  .map((s) => s.trim())
+  .filter(Boolean);
 
+// If you ever set cookies over a proxy/CDN (Render), keep this:
+app.set("trust proxy", 1);
+
+// ---- CORS FIRST, before everything else ----
+const corsOptions = {
+  origin(origin, cb) {
+    // no Origin (e.g. curl, server-to-server) -> allow
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error("CORS: origin not allowed"));
+  },
+  credentials: true, // ok even if you don't use cookies; harmless
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+app.use(cors(corsOptions));
+
+// Make sure preflights always succeed fast
+app.options("*", cors(corsOptions));
+
+// ---- Body + security ----
+app.use(express.json());
+// Keep helmet after CORS so the CORS headers aren’t interfered with
 app.use(
-  cors({
-    origin(origin, cb) {
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-      cb(new Error("CORS not allowed"));
-    },
-    credentials: true,
+  helmet({
+    // If you ever embed cross-origin resources and see COEP/COOP issues,
+    // you can relax these, but defaults are fine for a pure JSON API.
+    // crossOriginEmbedderPolicy: false,
+    // crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use(express.json());
-app.use(helmet());
+
+// Don’t rate-limit CORS preflights
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 300, // per-IP
+    windowMs: 15 * 60 * 1000,
+    max: 300,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method === "OPTIONS",
   })
 );
 
@@ -122,15 +147,14 @@ app.post("/login", async (req, res) => {
 // ----- metrics -----
 app.get("/metrics/summary", (_req, res) => {
   res.json({
-    traffic: 60 + Math.floor(Math.random() * 100), // 60–159
-    airQuality: 80 + Math.floor(Math.random() * 100), // 80–179 (AQI-ish)
-    waste: 20 + Math.floor(Math.random() * 70), // 20–89
-    electricity: 300 + Math.floor(Math.random() * 250), // 300–549 (for UI tile)
+    traffic: 60 + Math.floor(Math.random() * 100),
+    airQuality: 80 + Math.floor(Math.random() * 100),
+    waste: 20 + Math.floor(Math.random() * 70),
+    electricity: 300 + Math.floor(Math.random() * 250),
   });
 });
 
-// ----- thresholds  -----
-// all thresholds
+// ----- thresholds -----
 app.get("/thresholds", auth, async (_req, res) => {
   try {
     const { rows } = await db.query(
@@ -296,7 +320,18 @@ app.post("/alerts", auth, async (req, res) => {
   }
 });
 
-// ----- start AFTER ensuring schema -----
+// ---- last: error handlers (important for CORS) ----
+app.use((err, req, res, _next) => {
+  if (err && /CORS/i.test(err.message)) {
+    // Make failures explicit instead of showing 500 in the browser console
+    res.setHeader("Vary", "Origin");
+    return res.status(403).json({ error: "CORS blocked for this origin" });
+  }
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
+// ----- start after schema -----
 ensureWeek4Schema()
   .then(() => {
     app.listen(PORT, () => {
