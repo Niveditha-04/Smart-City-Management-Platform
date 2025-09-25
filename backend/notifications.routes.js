@@ -89,106 +89,42 @@ router.post("/webpush/unsubscribe", auth, async (req, res) => {
 });
 
 
-// POST /notifications/webpush/send
-router.post(
-  "/webpush/send",
-  auth,
-  requireRole("admin", "operator"),
-  async (req, res) => {
-    try {
-      const {
-        title,
-        body = "",
-        url = "/alerts",
-        tag,
-        // optional metadata to persist
-        notification_id,
-        alert_id = null,
-        severity = "low",
-        source = "alert",
-        channel = "webpush",
-      } = req.body || {};
+router.post("/webpush/send", auth, requireRole("admin", "operator"), async (req, res) => {
+  try {
+    const { title, body, url, tag } = req.body || {};
+    if (!title) return res.status(400).json({ error: "Missing title" });
 
-      if (!title) return res.status(400).json({ error: "Missing title" });
+    // broadcast to all subscriptions
+    const { rows } = await pool.query(
+      "SELECT endpoint, p256dh, auth FROM webpush_subscriptions"
+    );
 
-      // 0) Ensure there is a notifications row
-      let id = notification_id;
-      if (!id) {
-        const insert = await pool.query(
-          `INSERT INTO notifications (title, message, severity, source, alert_id, channel, status, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,'queued', NOW())
-           RETURNING id`,
-          [title, body, severity, source, alert_id, channel]
-        );
-        id = insert.rows[0].id;
-      }
-
-      // 1) Load all current subscriptions
-      const { rows } = await pool.query(
-        "SELECT endpoint, p256dh, auth FROM webpush_subscriptions"
-      );
-
-      // 2) If none, mark and return (still recorded in DB)
-      if (!rows.length) {
-        await pool.query(
-          `UPDATE notifications
-             SET status = 'no_subscribers',
-                 delivery_report = $2::jsonb,
-                 sent_at = NOW()
-           WHERE id = $1`,
-          [id, JSON.stringify({ sent: 0, results: [] })]
-        );
-        return res.json({ ok: true, id, sent: 0, results: [] });
-      }
-
-      // 3) Send the push
-      const payload = JSON.stringify({ title, body, url, tag });
-      const results = await Promise.all(
-        rows.map(async (r) => {
-          const subscription = {
-            endpoint: r.endpoint,
-            keys: { p256dh: r.p256dh, auth: r.auth },
-          };
-          try {
-            await webpush.sendNotification(subscription, payload);
-            return { endpoint: r.endpoint, ok: true };
-          } catch (e) {
-            // clean up dead subscriptions
-            if (e?.statusCode === 404 || e?.statusCode === 410) {
-              await pool.query(
-                "DELETE FROM webpush_subscriptions WHERE endpoint=$1",
-                [r.endpoint]
-              );
-            }
-            return {
-              endpoint: r.endpoint,
-              ok: false,
-              error: e?.message || "send failed",
-            };
-          }
-        })
-      );
-
-      const sent = results.filter((r) => r.ok).length;
-
-      // 4) Persist delivery status & report
-      await pool.query(
-        `UPDATE notifications
-           SET status = $2,
-               delivery_report = $3::jsonb,
-               sent_at = NOW()
-         WHERE id = $1`,
-        [id, sent > 0 ? "sent" : "failed", JSON.stringify({ sent, results })]
-      );
-
-      return res.json({ ok: true, id, sent, results });
-    } catch (err) {
-      console.error("[webpush.send] error:", err);
-      return res.status(500).json({ error: "Failed to send push" });
+    if (!rows.length) {
+      return res.json({ ok: true, sent: 0, results: [] });
     }
-  }
-);
 
+    const payload = JSON.stringify({ title, body, url, tag });
+    const results = await Promise.all(
+      rows.map(async (r) => {
+        const subscription = { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } };
+        try {
+          await webpush.sendNotification(subscription, payload);
+          return { endpoint: r.endpoint, ok: true };
+        } catch (e) {
+          if (e?.statusCode === 404 || e?.statusCode === 410) {
+            await pool.query("DELETE FROM webpush_subscriptions WHERE endpoint=$1", [r.endpoint]);
+          }
+          return { endpoint: r.endpoint, ok: false, error: e?.message || "send failed" };
+        }
+      })
+    );
+
+    res.json({ ok: true, sent: results.filter((r) => r.ok).length, results });
+  } catch (err) {
+    console.error("[webpush.send] error:", err);
+    res.status(500).json({ error: "Failed to send push" });
+  }
+});
 
 
 
