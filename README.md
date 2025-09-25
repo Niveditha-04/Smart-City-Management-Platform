@@ -8,9 +8,9 @@
 ---
 **Links**
 
-**Frontend Dashboard Link:**
+**Frontend Dashboard Link:** https://smart-city-management-platform.onrender.com/
 
-**Backend Link:**
+**Backend Link:** https://smartcity-kwvz.onrender.com/
 
 --- 
 
