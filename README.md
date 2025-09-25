@@ -72,6 +72,14 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
 
 ---
 
+**Project Output**
+
+![Project Output](Images/dashboard.png)
+
+
+
+---
+
 ## Tech Stack
 - **Frontend:** React.js, Chart.js, Axios  
 - **Backend:** Node.js, Express.js, JWT, Bcrypt, Resend, Web Push API  
