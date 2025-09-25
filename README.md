@@ -24,7 +24,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
   - REST API endpoints for authentication, metrics, thresholds, and alerts
   - JWT-based authentication and role-based authorization
   - Database integration with PostgreSQL
-  - Notifications via **Email (Nodemailer)** and **Web Push API**
+  - Notifications via **Email (Resend)** and **Web Push API**
 
 - **Database (PostgreSQL)**
   - Tables: `users`, `alerts`, `alerts_breaches`, `metrics_timeseries`, `thresholds`
@@ -51,7 +51,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
 
 ## Tech Stack
 - **Frontend:** React.js, Chart.js, Axios  
-- **Backend:** Node.js, Express.js, JWT, Bcrypt, Nodemailer, Web Push API  
+- **Backend:** Node.js, Express.js, JWT, Bcrypt, Resend, Web Push API  
 - **Database:** PostgreSQL (via `pg`)  
 - **Security:** Helmet, express-rate-limit, CORS  
 - **Testing:** Jest, Supertest  
