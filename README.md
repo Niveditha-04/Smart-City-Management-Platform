@@ -74,7 +74,7 @@ It integrates real-time metrics, visual dashboards, and alerting mechanisms to s
 
 **Project Output**
 
-![Project Output](Images/dashboard.png)
+![Project Output](docs/Images/dDashboard page.png)
 
 
 
